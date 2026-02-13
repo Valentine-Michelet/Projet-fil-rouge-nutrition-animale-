@@ -1,0 +1,11 @@
+# Data - keep only sources/
+data/*
+!data/sources/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+.idea/
