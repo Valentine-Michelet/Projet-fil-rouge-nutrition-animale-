@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Diagnostics modèle</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+
+    <div class="d-flex">
+
+        <!-- Sidebar -->
+        <div class="bg-dark text-white p-3" style="width: 220px; min-height: 100vh;">
+            <h4 class="text-center mb-4">MiniML</h4>
+            <ul class="nav flex-column gap-2">
+                <li class="nav-item"><a class="nav-link text-white" href="/">Accueil</a></li>
+                <li class="nav-item"><a class="nav-link text-white" href="/model_info">Model Info</a></li>
+                <li class="nav-item"><a class="nav-link text-white" href="/predict">Prédiction</a></li>
+                <li class="nav-item"><a class="nav-link text-white fw-bold" href="/diagnostics">Diagnostics</a></li>
+            </ul>
+        </div>
+
+        <!-- Contenu -->
+        <div class="container-fluid p-4">
+
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h2 class="mb-0">Diagnostics modèle</h2>
+                <span class="badge bg-secondary">split={{ split }}, n={{ n }}, seed={{ seed }}</span>
+            </div>
+            <div class="card p-3 mb-4 shadow-sm">
+                <h5>À propos de cette page</h5>
+
+                <p>
+                    Cette page permet d'évaluer le comportement du modèle sur un échantillon
+                    de données issues de l'ensemble <b>train</b> ou <b>test</b>.
+                </p>
+
+                <div class="alert alert-info">
+                    <b>Important :</b> le modèle n'est <u>pas réentraîné</u> lorsque vous cliquez sur
+                    "Recalculer".
+                    Seul l’échantillon de données utilisé pour l’évaluation change.
+                </div>
+
+                <h6>Ce que vous pouvez faire</h6>
+                <ul>
+                    <li>
+                        <b>Choisir le jeu de données</b> :
+                        <ul>
+                            <li><b>train</b> : données utilisées pour entraîner le modèle</li>
+                            <li><b>test</b> : données jamais vues pendant l'entraînement</li>
+                        </ul>
+                    </li>
+
+                    <li>
+                        <b>Limiter le nombre de points</b> :
+                        permet de tracer les graphiques plus rapidement et de garder une bonne lisibilité.
+                    </li>
+
+                    <li>
+                        <b>Changer la seed</b> :
+                        modifie l’échantillon aléatoire sélectionné dans le jeu de données.
+                        Le modèle reste identique.
+                    </li>
+
+                    <li>
+                        <b>Changer le nombre de colonnes</b> :
+                        ajuste uniquement la disposition des graphiques.
+                    </li>
+                </ul>
+
+                <h6>Interprétation des résultats</h6>
+
+                <ul>
+                    <li>
+                        <b>Predicted vs True</b> :
+                        chaque point représente une prédiction du modèle sur une observation réelle.
+                        Plus les points sont proches de la diagonale rouge, plus la prédiction est précise.
+                    </li>
+
+                    <li>
+                        <b>MAE</b> :
+                        erreur moyenne absolue, exprimée dans les unités de la variable.
+                    </li>
+
+                    <li>
+                        <b>RMSE</b> :
+                        erreur quadratique moyenne, plus sensible aux grosses erreurs.
+                    </li>
+
+                    <li>
+                        <b>R²</b> :
+                        proportion de variance expliquée par le modèle.
+                        <ul>
+                            <li>1 = prédiction parfaite</li>
+                            <li>0 = modèle équivalent à la moyenne</li>
+                            <li>&lt; 0 = modèle mauvais</li>
+                        </ul>
+                    </li>
+
+                    <li>
+                        <b>Histogramme des résidus</b> :
+                        permet de visualiser la distribution des erreurs.
+                        Une distribution centrée autour de 0 indique un modèle bien calibré.
+                    </li>
+                </ul>
+
+                <h6>But de cette page</h6>
+                <ul>
+                    <li>visualiser rapidement les performances du modèle</li>
+                    <li>comparer train vs test</li>
+                    <li>détecter un surapprentissage (overfitting)</li>
+                    <li>comprendre le comportement du modèle sur des données réelles</li>
+                </ul>
+
+            </div>
+
+
+
+            <!-- Controls -->
+            <div class="card p-3 mb-4 shadow-sm">
+                <form method="get" action="/diagnostics" class="row g-3 align-items-end">
+
+                    <div class="col-md-2">
+                        <label class="form-label">Split</label>
+                        <select name="split" class="form-select">
+                            <option value="test" {% if split=="test" %}selected{% endif %}>test</option>
+                            <option value="train" {% if split=="train" %}selected{% endif %}>train</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label">Nb points</label>
+                        <input type="number" class="form-control" name="n" min="50" value="{{ n }}">
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label">Seed</label>
+                        <input type="number" class="form-control" name="seed" value="{{ seed }}">
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label">Nb colonnes</label>
+                        <input type="number" class="form-control" name="ncols" min="2" max="6" value="{{ ncols }}">
+                    </div>
+
+                    <div class="col-md-4">
+                        <button class="btn btn-primary w-100">Recalculer</button>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Seuil erreur (%)</label>
+                        <input type="number" step="1" class="form-control" name="err_thresh"
+                            value="{{ (error_threshold*100)|round(0) }}">
+                    </div>
+
+                </form>
+            </div>
+
+            <!-- Global metrics -->
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <div class="card p-3 shadow-sm">
+                        <div class="text-muted">MAE (moyenne)</div>
+                        <div class="fs-4 fw-bold">{{ '%.3f'|format(global_metrics.mae) }}</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-3 shadow-sm">
+                        <div class="text-muted">RMSE (moyenne)</div>
+                        <div class="fs-4 fw-bold">{{ '%.3f'|format(global_metrics.rmse) }}</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-3 shadow-sm">
+                        <div class="text-muted">R² (moyenne)</div>
+                        <div class="fs-4 fw-bold">{{ '%.3f'|format(global_metrics.r2) }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Plots -->
+            <div class="card p-3 mb-4 shadow-sm">
+                <h5 class="mb-3">Predicted vs True</h5>
+                <div>
+                    {{ plot_scatter | safe }}
+                </div>
+            </div>
+
+            <div class="card p-3 mb-4 shadow-sm">
+                <h5 class="mb-3">Métriques par cible</h5>
+                <div class="mb-3">
+                    {{ plot_metrics | safe }}
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>Cible</th>
+                                <th>MAE</th>
+                                <th>RMSE</th>
+                                <th>R²</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in metrics_rows %}
+                            <tr>
+                                <td>{{ r.target }}</td>
+                                <td>{{ '%.3f'|format(r.mae) }}</td>
+                                <td>{{ '%.3f'|format(r.rmse) }}</td>
+                                <td>{{ '%.3f'|format(r.r2) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card p-3 mb-4 shadow-sm">
+                <h5 class="mb-3">Résidus</h5>
+                <div>
+                    {{ plot_resid | safe }}
+                </div>
+                <p class="text-muted mb-0">
+                    Résidus = y_pred - y_true (toutes cibles concaténées).
+                </p>
+            </div>
+            <div class="card p-3 mb-4 shadow-sm">
+
+                <h5 class="mb-3">Valeurs réelles vs prédites</h5>
+
+                <p class="text-muted">
+                    Tableau des valeurs sur l’échantillon affiché.
+                    Chaque échantillon apparaît deux fois : une ligne "true" et une ligne "pred".
+                </p>
+                <p class="text-muted">
+                    Les cellules en rouge indiquent une erreur supérieure à {{ (error_threshold*100)|round(0) }}%.
+                </p>
+
+                <!-- Bouton déroulant -->
+                <p>
+                    <button class="btn btn-outline-primary" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#tableCollapse">
+                        Afficher / masquer le tableau
+                    </button>
+                </p>
+
+                <div class="collapse" id="tableCollapse">
+
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped table-hover align-middle">
+
+                            <thead>
+                                <tr>
+                                    <th>sample</th>
+                                    <th>type</th>
+                                    {% for name in target_names %}
+                                    <th>{{ name }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for row in table_rows %}
+                                <tr>
+                                    <td>{{ row.sample_id }}</td>
+                                    <td>
+                                        {% if row.type == "true" %}
+                                        <span class="badge bg-secondary">true</span>
+                                        {% else %}
+                                        <span class="badge bg-primary">pred</span>
+                                        {% endif %}
+                                    </td>
+
+                                    {% for name in target_names %}
+                                    <td {% if row.type=="pred" and row.errors[name] %} class="table-danger" {% endif %}>
+                                        {{ '%.3f'|format(row[name]) }}
+                                    </td>
+
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+
+                        </table>
+                    </div>
+
+                </div>
+
+            </div>
+
+
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+
+</html>
