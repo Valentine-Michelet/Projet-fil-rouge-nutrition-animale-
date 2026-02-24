@@ -123,4 +123,27 @@ def sep_extr_X_y(df, embedding, Nom_a_separer = "Blé tendre", colonne = "Nom", 
     return emb_avec, emb_sans, X_vars_avec, X_vars_sans, y_avec, y_sans
 
 
+def import_moyennes(data_dir: str = "data", 
+                    path="data/Moyenne_Feedtables.csv") -> pd.DataFrame:
+    
+    df = pd.read_csv(
+        path,
+        sep=";",
+        encoding="utf-8",
+        decimal=","
+    )
 
+    # Nettoyage
+    df.columns = df.columns.str.strip()
+    df["Nom"] = df["Nom"].astype(str).str.strip()
+
+    # Index produit pour acces rapide
+    df = df.set_index("Nom")
+
+    # Conversion numerique (les trucs non numeriques -> NaN)
+    df = df.apply(pd.to_numeric, errors="coerce")
+
+    # Optionnel: nettoyer l index (espaces, etc.)
+    df.index = df.index.astype(str).str.strip()
+
+    return df
