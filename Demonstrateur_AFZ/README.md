@@ -51,19 +51,29 @@ Le modèle prédit notamment :
 
 ---
 
-## 🗂 Structure du projet
+## Structure du projet
 
 
 ├── main.py # Application FastAPI
+
 ├── models.py # Entraînement et prédiction
+
 ├── utils.py # Fonctions utilitaires (imputation, IC, métriques)
+
 ├── data/
+
 │ ├── Donnees_IA_2025.csv
+
 │ ├── Moyenne_Feedtables.csv
+
 │ ├── IC_allfeatures.csv
+
 │ └── IC_mspb.csv
+
 ├── templates/ # Templates HTML (Bootstrap)
+
 ├── environment_api.yml # Environnement Conda
+
 └── README.md
 
 
