@@ -242,7 +242,7 @@ def train_xgboost_models_cv(
     n_splits: int = 5,
     random_state: int = 42,
     xgb_params: Optional[Dict] = None
-) -> Tuple[pd.DataFrame, Dict[str, float], Dict[str, List[float]], List[Dict]]:
+) -> Tuple[pd.DataFrame, Dict[str, float], Dict[str, List[float]], List[Dict], List[float]]:
     """
     Train XGBoost models using K-Fold Cross-Validation with metrics tracking.
     
@@ -256,11 +256,12 @@ def train_xgboost_models_cv(
         xgb_params: Optional XGBoost parameters dict
         
     Returns:
-        Tuple of (summary_df, global_metrics_dict, fold_metrics_dict, all_fold_results)
+        Tuple of (summary_df, global_metrics_dict, fold_metrics_dict, all_fold_results, r2_global_folds)
         - summary_df: DataFrame with mean and std for each target
         - global_metrics_dict: Overall R² metrics across all folds
         - fold_metrics_dict: Per-target metrics for each fold
         - all_fold_results: List of detailed results per fold
+        - r2_global_folds: List of global R² scores (one per fold)
     """
     if xgb_params is None:
         xgb_params = {}
@@ -342,7 +343,7 @@ def train_xgboost_models_cv(
         'R2_std': summary_df['R2_mean'].std()
     }
     
-    return summary_df, global_metrics, fold_scores, all_fold_results
+    return summary_df, global_metrics, fold_scores, all_fold_results, r2_global_folds
 
 
 def get_hidden_products_info(classe_test: np.ndarray, nom_test: np.ndarray) -> pd.DataFrame:
@@ -430,3 +431,135 @@ def robustness_test_features_removed(
         results[f"Without {feature_to_drop}"] = (results_df, metrics)
     
     return results
+
+
+def leave_one_product_out_cv(
+    data: pd.DataFrame,
+    features: List[str],
+    target_cols: List[str],
+    simplified_names: Dict[str, str],
+    product_col: str = 'Nom',
+    random_state: int = 42,
+    xgb_params: Optional[Dict] = None
+) -> Tuple[pd.DataFrame, Dict[str, float], Dict[str, List[float]], List[Dict], List[float]]:
+    """
+    Leave One Product Out Cross-Validation for OOD evaluation.
+    For each unique product, train on all OTHER products and test on that product.
+    
+    Args:
+        data: Full DataFrame
+        features: List of feature columns
+        target_cols: List of target column names
+        simplified_names: Mapping of full names to simplified names
+        product_col: Column name for product identifier (default: 'Nom')
+        random_state: Random seed
+        xgb_params: Optional XGBoost parameters dict
+        
+    Returns:
+        Tuple of (summary_df, global_metrics_dict, fold_metrics_dict, all_fold_results, r2_global_folds)
+        - summary_df: DataFrame with mean and std for each target variable
+        - global_metrics_dict: Overall R² metrics (mean, std, min, max)
+        - fold_metrics_dict: Per-target metrics for each fold (product left out)
+        - all_fold_results: List of detailed results per fold
+        - r2_global_folds: List of global R² scores (one per product/fold)
+    """
+    if xgb_params is None:
+        xgb_params = {}
+    
+    # Get unique products
+    unique_products = data[product_col].unique()
+    
+    # Storage for metrics
+    fold_scores = {target: {'R2': [], 'MAE': [], 'RMSE': []} for target in target_cols}
+    all_fold_results = []
+    r2_global_folds = []
+    product_sizes = []
+    
+    fold_idx = 0
+    for product_to_hide in unique_products:
+        fold_idx += 1
+        
+        # Split: train on all other products, test on this product
+        train_indices = data[data[product_col] != product_to_hide].index
+        test_indices = data[data[product_col] == product_to_hide].index
+        
+        X_train = data.loc[train_indices, features].reset_index(drop=True)
+        X_test = data.loc[test_indices, features].reset_index(drop=True)
+        y_train = data.loc[train_indices, target_cols].reset_index(drop=True)
+        y_test = data.loc[test_indices, target_cols].reset_index(drop=True)
+        
+        # Record product info
+        product_size = len(X_test)
+        product_sizes.append({
+            'Product': product_to_hide,
+            'Size': product_size
+        })
+        
+        fold_results = []
+        y_pred_all = []
+        
+        # Train model for each target
+        for target in target_cols:
+            # Train individual model
+            model = xgb.XGBRegressor(random_state=random_state, **xgb_params)
+            model.fit(X_train, y_train[target], verbose=False)
+            
+            # Predict
+            y_pred = model.predict(X_test)
+            
+            # Calculate metrics
+            mae = mean_absolute_error(y_test[target], y_pred)
+            rmse = np.sqrt(mean_squared_error(y_test[target], y_pred))
+            r2 = r2_score(y_test[target], y_pred)
+            
+            fold_scores[target]['R2'].append(r2)
+            fold_scores[target]['MAE'].append(mae)
+            fold_scores[target]['RMSE'].append(rmse)
+            
+            fold_results.append({
+                'Fold': fold_idx,
+                'Product': product_to_hide,
+                'Product_Size': product_size,
+                'Variable cible': simplified_names.get(target, target),
+                'MAE': mae,
+                'RMSE': rmse,
+                'R2': r2
+            })
+            
+            y_pred_all.append(y_pred)
+        
+        # Calculate global metrics for this fold
+        y_pred_all = np.column_stack(y_pred_all)
+        y_test_all = y_test[target_cols].values
+        
+        r2_weighted = r2_score(y_test_all, y_pred_all, multioutput='variance_weighted')
+        r2_global_folds.append(r2_weighted)
+        
+        all_fold_results.extend(fold_results)
+    
+    # Create summary DataFrame
+    summary_data = []
+    for target in target_cols:
+        summary_data.append({
+            'Variable cible': simplified_names.get(target, target),
+            'R2_mean': np.mean(fold_scores[target]['R2']),
+            'R2_std': np.std(fold_scores[target]['R2'], ddof=1),
+            'MAE_mean': np.mean(fold_scores[target]['MAE']),
+            'MAE_std': np.std(fold_scores[target]['MAE'], ddof=1),
+            'RMSE_mean': np.mean(fold_scores[target]['RMSE']),
+            'RMSE_std': np.std(fold_scores[target]['RMSE'], ddof=1)
+        })
+    
+    summary_df = pd.DataFrame(summary_data)
+    
+    # Global metrics
+    global_metrics = {
+        'R2_variance_weighted_mean': np.mean(r2_global_folds),
+        'R2_variance_weighted_std': np.std(r2_global_folds),
+        'R2_mean': summary_df['R2_mean'].mean(),
+        'R2_std': summary_df['R2_mean'].std(),
+        'R2_min': summary_df['R2_mean'].min(),
+        'R2_max': summary_df['R2_mean'].max()
+    }
+    
+    return summary_df, global_metrics, fold_scores, all_fold_results, r2_global_folds

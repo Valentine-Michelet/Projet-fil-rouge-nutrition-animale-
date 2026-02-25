@@ -600,11 +600,12 @@ def plot_cv_results_per_target(
                   linewidth=1.5,
                   error_kw={'linewidth': 3, 'ecolor': '#D62828', 'capthick': 3})  # Thicker error bars
     
-    ax.set_xlabel('Target Variables', fontsize=13, fontweight='bold')
-    ax.set_ylabel(metric.replace('_', ' ').title(), fontsize=13, fontweight='bold')
-    ax.set_title(title, fontsize=15, fontweight='bold', pad=20)
+    ax.set_xlabel('Target Variables', fontsize=16, fontweight='bold')
+    ax.set_ylabel(metric.replace('_', ' ').title(), fontsize=16, fontweight='bold')
+    ax.set_title(title, fontsize=18, fontweight='bold', pad=20)
     ax.set_xticks(x_pos)
-    ax.set_xticklabels(df_sorted['Variable cible'], rotation=45, ha='right', fontsize=11)
+    ax.set_xticklabels(df_sorted['Variable cible'], rotation=45, ha='right', fontsize=14)
+    ax.tick_params(axis='y', labelsize=13)
     
     # Smart y-axis scaling for better visibility (calculate FIRST)
     max_val = (df_sorted[metric] + df_sorted[metric_std]).max()
@@ -634,7 +635,7 @@ def plot_cv_results_per_target(
             std_str = f'{std:.4f}'
         
         ax.text(i, y_text, f'{mean:.4f}\n±{std_str}', 
-                ha='center', va='bottom', fontsize=8, fontweight='bold')
+                ha='center', va='bottom', fontsize=11, fontweight='bold')
     
     ax.grid(axis='y', alpha=0.3, linestyle='--')
     
@@ -694,11 +695,12 @@ def plot_cv_results_comparison(
                   linewidth=1.5,
                   error_kw={'linewidth': 3, 'ecolor': '#333333', 'capthick': 3})  # Thicker error bars
     
-    ax.set_xlabel('Models', fontsize=13, fontweight='bold')
-    ax.set_ylabel('R² (Variance Weighted)', fontsize=13, fontweight='bold')
-    ax.set_title(title, fontsize=15, fontweight='bold', pad=20)
+    ax.set_xlabel('Models', fontsize=16, fontweight='bold')
+    ax.set_ylabel('R² (Variance Weighted)', fontsize=16, fontweight='bold')
+    ax.set_title(title, fontsize=18, fontweight='bold', pad=20)
     ax.set_xticks(x_pos)
-    ax.set_xticklabels(models, rotation=45, ha='right', fontsize=11)
+    ax.set_xticklabels(models, rotation=45, ha='right', fontsize=14)
+    ax.tick_params(axis='y', labelsize=13)
     
     # Smart y-axis scaling for better visibility (calculate FIRST)
     max_val = (np.array(means) + np.array(stds)).max()
@@ -727,7 +729,7 @@ def plot_cv_results_comparison(
             std_str = f'{std:.4f}'
         
         ax.text(i, y_text, f'{mean:.4f}\n±{std_str}', 
-                ha='center', va='bottom', fontsize=8, fontweight='bold')
+                ha='center', va='bottom', fontsize=11, fontweight='bold')
     
     ax.grid(axis='y', alpha=0.3, linestyle='--')
     
@@ -779,10 +781,10 @@ def plot_cv_results_all_targets_grid(
                       linewidth=1,
                       error_kw={'linewidth': 2.5, 'ecolor': '#333333', 'capthick': 2})  # Thicker error bars
         
-        ax.set_title(model_name, fontsize=12, fontweight='bold', pad=10)
-        ax.set_ylabel('R² Mean ± Std', fontsize=10, fontweight='bold')
+        ax.set_title(model_name, fontsize=14, fontweight='bold', pad=10)
+        ax.set_ylabel('R² Mean ± Std', fontsize=12, fontweight='bold')
         ax.set_xticks(x_pos)
-        ax.set_xticklabels(df_sorted['Variable cible'], rotation=45, ha='right', fontsize=8)
+        ax.set_xticklabels(df_sorted['Variable cible'], rotation=45, ha='right', fontsize=10)
         ax.grid(axis='y', alpha=0.3, linestyle='--')
         
         # Smart y-axis scaling
@@ -811,14 +813,14 @@ def plot_cv_results_all_targets_grid(
                 std_str = f'{std:.4f}'
             
             ax.text(i, y_text, f'{mean:.3f}\n±{std_str}', 
-                    ha='center', va='bottom', fontsize=7, fontweight='bold')
+                    ha='center', va='bottom', fontsize=9, fontweight='bold')
     
     # Hide unused subplots
     for idx in range(len(results_list), len(axes)):
         axes[idx].axis('off')
     
     fig.suptitle('Cross-Validation Results - All Models & Target Variables', 
-                 fontsize=16, fontweight='bold', y=0.995)
+                 fontsize=18, fontweight='bold', y=0.995)
     plt.tight_layout()
     
     return fig
