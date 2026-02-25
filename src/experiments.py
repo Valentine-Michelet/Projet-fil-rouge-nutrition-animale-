@@ -6,7 +6,7 @@ This is the core module for all XGBoost experiment scenarios.
 import pandas as pd
 import numpy as np
 import xgboost as xgb
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from typing import Tuple, Dict, List, Optional
 
@@ -232,6 +232,117 @@ def train_xgboost_models(
     }
     
     return df_resultats, metrics_globales, models
+
+
+def train_xgboost_models_cv(
+    X: pd.DataFrame,
+    y: pd.DataFrame,
+    target_cols: List[str],
+    simplified_names: Dict[str, str],
+    n_splits: int = 5,
+    random_state: int = 42,
+    xgb_params: Optional[Dict] = None
+) -> Tuple[pd.DataFrame, Dict[str, float], Dict[str, List[float]], List[Dict]]:
+    """
+    Train XGBoost models using K-Fold Cross-Validation with metrics tracking.
+    
+    Args:
+        X: Full feature DataFrame
+        y: Full targets DataFrame
+        target_cols: List of target column names
+        simplified_names: Mapping of full names to simplified names
+        n_splits: Number of CV folds (default: 5)
+        random_state: Random seed
+        xgb_params: Optional XGBoost parameters dict
+        
+    Returns:
+        Tuple of (summary_df, global_metrics_dict, fold_metrics_dict, all_fold_results)
+        - summary_df: DataFrame with mean and std for each target
+        - global_metrics_dict: Overall R² metrics across all folds
+        - fold_metrics_dict: Per-target metrics for each fold
+        - all_fold_results: List of detailed results per fold
+    """
+    if xgb_params is None:
+        xgb_params = {}
+    
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    
+    # Storage for metrics across folds
+    fold_scores = {target: {'R2': [], 'MAE': [], 'RMSE': []} for target in target_cols}
+    all_fold_results = []
+    r2_global_folds = []
+    
+    fold_idx = 0
+    for train_idx, test_idx in kf.split(X):
+        fold_idx += 1
+        X_train_fold = X.iloc[train_idx]
+        X_test_fold = X.iloc[test_idx]
+        y_train_fold = y.iloc[train_idx]
+        y_test_fold = y.iloc[test_idx]
+        
+        fold_results = []
+        y_pred_all = []
+        
+        for target in target_cols:
+            # Train model
+            model = xgb.XGBRegressor(random_state=random_state, **xgb_params)
+            model.fit(X_train_fold, y_train_fold[target])
+            
+            # Predict
+            y_pred = model.predict(X_test_fold)
+            
+            # Calculate metrics
+            mae = mean_absolute_error(y_test_fold[target], y_pred)
+            rmse = np.sqrt(mean_squared_error(y_test_fold[target], y_pred))
+            r2 = r2_score(y_test_fold[target], y_pred)
+            
+            fold_scores[target]['R2'].append(r2)
+            fold_scores[target]['MAE'].append(mae)
+            fold_scores[target]['RMSE'].append(rmse)
+            
+            fold_results.append({
+                'Fold': fold_idx,
+                'Variable cible': simplified_names.get(target, target),
+                'MAE': mae,
+                'RMSE': rmse,
+                'R2': r2
+            })
+            
+            y_pred_all.append(y_pred)
+        
+        # Calculate global metrics for this fold
+        y_pred_all = np.column_stack(y_pred_all)
+        y_test_all = y_test_fold[target_cols].values
+        
+        r2_weighted = r2_score(y_test_all, y_pred_all, multioutput='variance_weighted')
+        r2_global_folds.append(r2_weighted)
+        
+        all_fold_results.extend(fold_results)
+    
+    # Create summary DataFrame
+    summary_data = []
+    for target in target_cols:
+        summary_data.append({
+            'Variable cible': simplified_names.get(target, target),
+            'R2_mean': np.mean(fold_scores[target]['R2']),
+            'R2_std': np.std(fold_scores[target]['R2'], ddof=1),  # Use ddof=1 for better estimation
+            'MAE_mean': np.mean(fold_scores[target]['MAE']),
+            'MAE_std': np.std(fold_scores[target]['MAE'], ddof=1),  # Use ddof=1 for better estimation
+            'RMSE_mean': np.mean(fold_scores[target]['RMSE']),
+            'RMSE_std': np.std(fold_scores[target]['RMSE'], ddof=1)  # Use ddof=1 for better estimation
+        })
+    
+    summary_df = pd.DataFrame(summary_data)
+    
+    # Global metrics
+    global_metrics = {
+        'R2_variance_weighted_mean': np.mean(r2_global_folds),
+        'R2_variance_weighted_std': np.std(r2_global_folds),
+        'R2_mean': summary_df['R2_mean'].mean(),
+        'R2_std': summary_df['R2_mean'].std()
+    }
+    
+    return summary_df, global_metrics, fold_scores, all_fold_results
 
 
 def get_hidden_products_info(classe_test: np.ndarray, nom_test: np.ndarray) -> pd.DataFrame:

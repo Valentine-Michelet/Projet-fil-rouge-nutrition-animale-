@@ -559,3 +559,266 @@ def plot_ml_results(
 
     plt.tight_layout()
     return fig
+
+
+def plot_cv_results_per_target(
+    summary_df: pd.DataFrame,
+    metric: str = 'R2_mean',
+    metric_std: str = 'R2_std',
+    title: str = "Cross-Validation Results per Target",
+    figsize: Tuple[int, int] = (14, 8),
+    color: str = '#2E86AB'
+) -> plt.Figure:
+    """
+    Plot CV results for each target variable with error bars.
+    Publication-ready visualization for a single model.
+    
+    Args:
+        summary_df: DataFrame with columns ['Variable cible', metric, metric_std, ...]
+        metric: Column name for means (default: 'R2_mean')
+        metric_std: Column name for standard deviations (default: 'R2_std')
+        title: Plot title
+        figsize: Figure size
+        color: Bar color (hex or name)
+        
+    Returns:
+        Matplotlib figure
+    """
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    # Sort by metric descending
+    df_sorted = summary_df.copy() # On garde l'ordre original
+    x_pos = np.arange(len(df_sorted))
+    
+    # Create bars with error bars
+    bars = ax.bar(x_pos, df_sorted[metric], 
+                  yerr=df_sorted[metric_std],
+                  capsize=8,  # Increased from 6 for better visibility
+                  alpha=0.8,
+                  color=color,
+                  edgecolor='black',
+                  linewidth=1.5,
+                  error_kw={'linewidth': 3, 'ecolor': '#D62828', 'capthick': 3})  # Thicker error bars
+    
+    ax.set_xlabel('Target Variables', fontsize=13, fontweight='bold')
+    ax.set_ylabel(metric.replace('_', ' ').title(), fontsize=13, fontweight='bold')
+    ax.set_title(title, fontsize=15, fontweight='bold', pad=20)
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(df_sorted['Variable cible'], rotation=45, ha='right', fontsize=11)
+    
+    # Smart y-axis scaling for better visibility (calculate FIRST)
+    max_val = (df_sorted[metric] + df_sorted[metric_std]).max()
+    min_val = (df_sorted[metric] - df_sorted[metric_std]).min()
+    data_range = max_val - min_val
+    
+    # If values are very close together (e.g., 0.95-1.0), use narrower scale
+    if data_range < 0.05:
+        y_min = max(0, min_val - 0.02)
+        y_max = min(1.0, max_val + 0.05)
+    else:
+        y_min = max(0, min_val - 0.05)
+        y_max = min(1.0, max_val + 0.1)
+    
+    ax.set_ylim(y_min, y_max)
+    
+    # Add value labels on bars (positioned inside/above with proper spacing)
+    y_range = y_max - y_min
+    for i, (mean, std) in enumerate(zip(df_sorted[metric], df_sorted[metric_std])):
+        # Position text above bar, but with smaller font to fit better
+        y_text = mean + std + y_range * 0.01  # Small offset relative to axis range
+        
+        # Format std: show more decimals for very small values
+        if std < 0.001:
+            std_str = f'{std:.5f}'
+        else:
+            std_str = f'{std:.4f}'
+        
+        ax.text(i, y_text, f'{mean:.4f}\n±{std_str}', 
+                ha='center', va='bottom', fontsize=8, fontweight='bold')
+    
+    ax.grid(axis='y', alpha=0.3, linestyle='--')
+    
+    plt.subplots_adjust(top=0.92)  # Add space at top for labels
+    plt.tight_layout()
+    return fig
+
+
+def plot_cv_results_comparison(
+    results_dict: Dict[str, Dict],
+    metric_key: str = 'R2_variance_weighted_mean',
+    figsize: Tuple[int, int] = (12, 7),
+    title: str = "Model Comparison - Cross-Validation Results"
+) -> plt.Figure:
+    """
+    Compare global metrics across multiple models.
+    Publication-ready comparison visualization.
+    
+    Args:
+        results_dict: Dict mapping model names to their metrics dict
+                      Each dict should contain metric_key and f"{metric_key}_std"
+        metric_key: Key for the metric to compare (default: 'R2_variance_weighted_mean')
+        figsize: Figure size
+        title: Plot title
+        
+    Returns:
+        Matplotlib figure
+    """
+    models = []
+    means = []
+    stds = []
+    
+    for model_name, metrics in results_dict.items():
+        if metric_key in metrics:
+            models.append(model_name)
+            means.append(metrics[metric_key])
+            # Handle std key: replace '_mean' with nothing to get the std key
+            # E.g., 'R2_variance_weighted_mean' -> 'R2_variance_weighted_std'
+            std_key = metric_key.replace('_mean', '') + '_std'
+            stds.append(metrics.get(std_key, 0))
+    
+    # Sort by means descending
+    sorted_data = sorted(zip(models, means, stds), key=lambda x: x[1], reverse=True)
+    models, means, stds = zip(*sorted_data)
+    
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    colors = ['#2E86AB', '#A23B72', '#F18F01', '#C73E1D', '#6A994E', '#BC4749']
+    x_pos = np.arange(len(models))
+    
+    bars = ax.bar(x_pos, means, 
+                  yerr=stds,
+                  capsize=8,
+                  alpha=0.8,
+                  color=[colors[i % len(colors)] for i in range(len(models))],
+                  edgecolor='black',
+                  linewidth=1.5,
+                  error_kw={'linewidth': 3, 'ecolor': '#333333', 'capthick': 3})  # Thicker error bars
+    
+    ax.set_xlabel('Models', fontsize=13, fontweight='bold')
+    ax.set_ylabel('R² (Variance Weighted)', fontsize=13, fontweight='bold')
+    ax.set_title(title, fontsize=15, fontweight='bold', pad=20)
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(models, rotation=45, ha='right', fontsize=11)
+    
+    # Smart y-axis scaling for better visibility (calculate FIRST)
+    max_val = (np.array(means) + np.array(stds)).max()
+    min_val = (np.array(means) - np.array(stds)).min()
+    data_range = max_val - min_val
+    
+    # If values are very close together, use narrower scale
+    if data_range < 0.05:
+        y_min = max(0, min_val - 0.02)
+        y_max = min(1.0, max_val + 0.05)
+    else:
+        y_min = max(0, min_val - 0.05)
+        y_max = min(1.0, max_val + 0.1)
+    
+    ax.set_ylim(y_min, y_max)
+    
+    # Add value labels on bars (positioned with proper spacing)
+    y_range = y_max - y_min
+    for i, (mean, std) in enumerate(zip(means, stds)):
+        y_text = mean + std + y_range * 0.01  # Small offset relative to axis range
+        
+        # Format std: show more decimals for very small values
+        if std < 0.001:
+            std_str = f'{std:.5f}'
+        else:
+            std_str = f'{std:.4f}'
+        
+        ax.text(i, y_text, f'{mean:.4f}\n±{std_str}', 
+                ha='center', va='bottom', fontsize=8, fontweight='bold')
+    
+    ax.grid(axis='y', alpha=0.3, linestyle='--')
+    
+    plt.subplots_adjust(top=0.92)  # Add space at top for labels
+    plt.tight_layout()
+    return fig
+
+
+def plot_cv_results_all_targets_grid(
+    results_list: List[Tuple[str, pd.DataFrame]],
+    metric: str = 'R2_mean',
+    metric_std: str = 'R2_std',
+    figsize: Tuple[int, int] = (18, 12)
+) -> plt.Figure:
+    """
+    Plot detailed results for all models as a grid.
+    Shows all target variables for each model.
+    
+    Args:
+        results_list: List of (model_name, summary_df) tuples
+        metric: Column name for means
+        metric_std: Column name for standard deviations
+        figsize: Figure size
+        
+    Returns:
+        Matplotlib figure with grid of subplots
+    """
+    n_models = len(results_list)
+    n_cols = 2
+    n_rows = (n_models + 1) // n_cols
+    
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize)
+    axes = axes.flatten() if n_models > 1 else [axes]
+    
+    colors = ['#2E86AB', '#A23B72', '#F18F01', '#C73E1D', '#6A994E', '#BC4749']
+    
+    for idx, (model_name, summary_df) in enumerate(results_list):
+        ax = axes[idx]
+        
+        df_sorted = summary_df.copy()
+        x_pos = np.arange(len(df_sorted))
+        
+        bars = ax.bar(x_pos, df_sorted[metric],
+                      yerr=df_sorted[metric_std],
+                      capsize=6,  # Increased for better visibility
+                      alpha=0.7,
+                      color=colors[idx % len(colors)],
+                      edgecolor='black',
+                      linewidth=1,
+                      error_kw={'linewidth': 2.5, 'ecolor': '#333333', 'capthick': 2})  # Thicker error bars
+        
+        ax.set_title(model_name, fontsize=12, fontweight='bold', pad=10)
+        ax.set_ylabel('R² Mean ± Std', fontsize=10, fontweight='bold')
+        ax.set_xticks(x_pos)
+        ax.set_xticklabels(df_sorted['Variable cible'], rotation=45, ha='right', fontsize=8)
+        ax.grid(axis='y', alpha=0.3, linestyle='--')
+        
+        # Smart y-axis scaling
+        max_val = (df_sorted[metric] + df_sorted[metric_std]).max()
+        min_val = (df_sorted[metric] - df_sorted[metric_std]).min()
+        data_range = max_val - min_val
+        
+        if data_range < 0.05:
+            y_min = max(0, min_val - 0.02)
+            y_max = min(1.0, max_val + 0.05)
+        else:
+            y_min = max(0, min_val - 0.05)
+            y_max = min(1.0, max_val + 0.1)
+        
+        ax.set_ylim(y_min, y_max)
+        
+        # Add value labels (positioned with proper spacing)
+        y_range = y_max - y_min
+        for i, (mean, std) in enumerate(zip(df_sorted[metric], df_sorted[metric_std])):
+            y_text = mean + std + y_range * 0.01  # Small offset relative to axis range
+            
+            # Format std: show more decimals for very small values
+            if std < 0.001:
+                std_str = f'{std:.5f}'
+            else:
+                std_str = f'{std:.4f}'
+            
+            ax.text(i, y_text, f'{mean:.3f}\n±{std_str}', 
+                    ha='center', va='bottom', fontsize=7, fontweight='bold')
+    
+    # Hide unused subplots
+    for idx in range(len(results_list), len(axes)):
+        axes[idx].axis('off')
+    
+    fig.suptitle('Cross-Validation Results - All Models & Target Variables', 
+                 fontsize=16, fontweight='bold', y=0.995)
+    plt.tight_layout()
+    
+    return fig
