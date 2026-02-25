@@ -34,7 +34,16 @@ def prepare_data_random_split(
     X = data[features].copy()
     y = data[target_cols].copy()
     
-    return train_test_split(X, y, test_size=test_size, random_state=random_state)
+    # Stratification sur la colonne 'Nom' si elle existe dans les données
+    stratify_col = None
+    if 'Nom' in data.columns:
+        stratify_col = data['Nom']
+    return train_test_split(
+        X, y,
+        test_size=test_size,
+        random_state=random_state,
+        stratify=stratify_col
+    )
 
 
 def prepare_data_hide_one_per_class(
