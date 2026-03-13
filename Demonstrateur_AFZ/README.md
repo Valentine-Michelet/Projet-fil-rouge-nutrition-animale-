@@ -1,107 +1,79 @@
-# MiniML – Application de prédiction nutritionnelle
+# `Demonstrateur_AFZ/` — démonstrateur applicatif FastAPI
 
-MiniML est une application web développée avec **FastAPI** permettant d'entraîner un modèle de Machine Learning et de prédire plusieurs indicateurs nutritionnels à partir de caractéristiques physico-chimiques de matières premières agricoles.
+## Objet
 
-L’application intègre un pipeline complet de Data Science :  
-prétraitement des données, encodage, modélisation multi-sorties, estimation d’intervalles de confiance, visualisation des performances et export des résultats.
+`Demonstrateur_AFZ/` est une application web d'inférence destinée à prédire plusieurs variables nutritionnelles à partir d'un formulaire utilisateur. Le démonstrateur encapsule un pipeline d'encodage, d'imputation, d'entraînement XGBoost multi-sorties, de prédiction et d'export.
 
----
+## Architecture locale
 
-## Fonctionnalités
-
-- Modèle **XGBoost multi-sorties** (11 indicateurs nutritionnels prédits simultanément)
-- Encodage automatique des variables catégorielles (OneHotEncoder avec gestion des catégories inconnues)
-- Imputation automatique des valeurs manquantes via moyennes Feedtables
-- Sélection dynamique des intervalles de confiance selon la complétude des données
-- Interface web FastAPI + Bootstrap
-- Historique intégré des prédictions (inputs + outputs)
-- Indicateur d’imputation par prédiction
-- Export CSV complet (inputs + outputs + indicateur d’imputation)
-- Visualisation des performances du modèle (MAE, RMSE, R²)
-- Réentraînement dynamique du modèle
-
----
-
-## Pipeline Machine Learning
-
-1. Nettoyage et normalisation des données
-2. Encodage des variables catégorielles (OneHotEncoder)
-3. Séparation train/test
-4. Entraînement XGBoost multi-sorties
-5. Évaluation (MAE, RMSE, R²)
-6. Déploiement via FastAPI
-
----
-
-## Indicateurs prédits
-
-Le modèle prédit notamment :
-
-- EB (kcal/kg brut)
-- ED porc croissance (kcal/kg brut)
-- EM porc croissance (kcal/kg brut)
-- EN porc croissance (kcal/kg brut)
-- EMAn coq (kcal/kg brut)
-- EMAn poulet (kcal/kg brut)
-- UFL 2018 par kg brut
-- UFV 2018 par kg brut
-- PDIA 2018 g/kg brut
-- PDI 2018 g/kg brut
-- BalProRu 2018 g/kg brut
-
----
-
-## Structure du projet
-
-
-├── main.py # Application FastAPI
-
-├── models.py # Entraînement et prédiction
-
-├── utils.py # Fonctions utilitaires (imputation, IC, métriques)
-
-├── data/
-
-│ ├── Donnees_IA_2025.csv
-
-│ ├── Moyenne_Feedtables.csv
-
-│ ├── IC_allfeatures.csv
-
-│ └── IC_mspb.csv
-
-├── templates/ # Templates HTML (Bootstrap)
-
-├── environment_api.yml # Environnement Conda
-
+```text
+Demonstrateur_AFZ/
+├── main.py                 # routes FastAPI et orchestration applicative
+├── models.py               # chargement des données, entraînement, prédiction
+├── utils.py                # métriques, graphiques, IC, imputation
+├── data/                   # données nécessaires au démonstrateur
+├── templates/              # interface HTML Jinja2
+├── environment_api.yml     # environnement Conda dédié
 └── README.md
-
-
----
-
-## Installation
-
-Créer un environnement :
-
-```bash
-conda env create -f environment_api.yml
 ```
 
-## Lancement de l'application :
+## Dépendances entre fichiers
 
-Il est important de noter qu'une fois l'environnement est installé sur votre machin, il n'est plus nécessaire de le recréer.
-Il suffit juste de l'activer avec la commande : 
+```text
+data/*.csv
+   ├──> models.py
+   │      ├──> import_model()
+   │      └──> predict_from_input()
+   ├──> utils.py (IC et imputation)
+   └──> main.py via models.py / utils.py
 
-```bash
-conda activate api_ml_env
-```
- 
-Puis lancer l'application avec la commande : 
-A chaque lancement, un nouvel model est entrainé ici.
-
-```bash
-uvicorn main:app --reload
+templates/*.html ──> main.py ──> interface web FastAPI
 ```
 
+## Description des composants
 
+| Fichier | Rôle |
+|---|---|
+| `main.py` | initialise FastAPI, charge le modèle, expose les routes `/`, `/model_info`, `/predict`, `/diagnostics`, `/export_csv` |
+| `models.py` | lit `Donnees_IA_2025.csv`, entraîne un `XGBRegressor`, prépare l'encodeur OneHot et exécute l'inférence |
+| `utils.py` | calcule MAE/RMSE/R², génère des graphiques Plotly, gère l'imputation et la sélection des intervalles de confiance |
+| `data/` | fournit les CSV nécessaires au démonstrateur |
+| `templates/` | définit le rendu HTML de l'application |
 
+## Pipeline applicatif
+
+```text
+1. Lecture des données historiques (`data/Donnees_IA_2025.csv`)
+2. Encodage des variables catégorielles
+3. Séparation train/test
+4. Entraînement XGBoost multi-sorties au démarrage
+5. Formulaire utilisateur -> nettoyage -> imputation éventuelle
+6. Prédiction multi-cible + intervalles de confiance
+7. Visualisation / export CSV
+```
+
+## Commandes d'installation et d'exécution
+
+| Étape | Commande |
+|---|---|
+| Créer l'environnement | `cd Demonstrateur_AFZ && conda env create -f environment_api.yml` |
+| Activer l'environnement | `conda activate api_ml_env` |
+| Lancer l'application | `uvicorn main:app --reload` |
+| Ouvrir l'application | navigateur sur `http://127.0.0.1:8000` |
+
+## Routes principales
+
+| Route | Méthode | Fonction |
+|---|---|---|
+| `/` | GET | page d'accueil |
+| `/model_info` | GET | taille des jeux, métriques globales, paramètres du modèle |
+| `/predict` | GET/POST | formulaire puis prédiction multi-sortie |
+| `/diagnostics` | GET | visualisations des performances |
+| `/export_csv` | GET | export de l'historique des prédictions |
+| `/retrain` | POST | réentraînement du modèle |
+
+## Points d'attention
+
+- le modèle est réentraîné au chargement de l'application via `load_model()` ;
+- les chemins de données sont relatifs au dossier `Demonstrateur_AFZ/` ;
+- l'imputation dépend strictement de la présence du produit dans `Moyenne_Feedtables.csv`.
